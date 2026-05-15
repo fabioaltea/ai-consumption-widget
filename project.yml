@@ -1,0 +1,37 @@
+name: AIConsumptionWidget
+options:
+  bundleIdPrefix: com.fabioaltea
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  AIConsumptionWidget:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+        excludes: []
+      - path: Resources
+        buildPhase: resources
+        excludes:
+          - Info.plist
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleIdentifier: com.fabioaltea.AIConsumptionWidget
+        LSUIElement: true
+        NSPrincipalClass: NSApplication
+        LSMinimumSystemVersion: "14.0"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fabioaltea.AIConsumptionWidget
+        INFOPLIST_FILE: Resources/Info.plist
