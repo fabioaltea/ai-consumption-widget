@@ -67,6 +67,32 @@ struct ClaudeUsageSnapshot {
     let extraUsageEnabled: Bool
 }
 
+// GitHub Copilot API responses
+
+struct GitHubCopilotUserResponse: Codable {
+    let login: String
+    let copilot_plan: String?
+    let quota_reset_date: String?
+    let quota_snapshots: GitHubCopilotQuotaSnapshots?
+}
+
+struct GitHubCopilotQuotaSnapshots: Codable {
+    let premium_interactions: GitHubCopilotQuotaSnapshot?
+}
+
+struct GitHubCopilotQuotaSnapshot: Codable {
+    let percent_remaining: Double?
+    let remaining: Int?
+    let entitlement: Int?
+}
+
+struct GitHubCopilotUsageSnapshot {
+    let percentRemaining: Double
+    let remaining: Int
+    let entitlement: Int
+    let quotaResetDate: String?
+}
+
 // Anthropic API responses
 
 struct AnthropicUsageResponse: Codable {

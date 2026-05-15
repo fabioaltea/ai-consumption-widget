@@ -4,11 +4,11 @@ import SwiftUI
 @MainActor
 final class UsageStore: ObservableObject {
     @Published var services: [ServiceUsage] = []
-    @Published var isOnboarding: Bool = true
     @Published var lastRefresh: Date? = nil
     @Published var loginError: String? = nil
 
     private let claudeService = ClaudeWebService()
+    private let copilotService = GitHubCopilotWebService()
     private var refreshTask: Task<Void, Never>? = nil
 
     private let autoRefreshInterval: TimeInterval = 300
@@ -20,7 +20,6 @@ final class UsageStore: ObservableObject {
 
     func disconnect() {
         services = []
-        isOnboarding = true
         loginError = nil
         refreshTask?.cancel()
     }
@@ -28,26 +27,25 @@ final class UsageStore: ObservableObject {
     // MARK: - Usage fetching
 
     func refresh() async {
-        setClaudeLoading(true)
+        print("[UsageStore] Starting refresh...")
 
-        do {
-            print("[UsageStore] Starting refresh...")
-            let snapshot = try await claudeService.fetchUsage()
-            print("[UsageStore] Got snapshot: \(snapshot)")
-            isOnboarding = false
-            loginError = nil
-            updateClaudeUsage(from: snapshot)
-            print("[UsageStore] Refresh complete, services: \(services.count)")
-        } catch {
-            print("[UsageStore] Refresh failed: \(error)")
-            let hasRealData = services.contains { !$0.isLoading && $0.error == nil }
-            if !hasRealData {
-                isOnboarding = true
-                loginError = error.localizedDescription
-                services = []
-            } else {
-                setClaudeError(error.localizedDescription)
-            }
+        let availableProviders = discoverAvailableProviders()
+        guard !availableProviders.isEmpty else {
+            services = []
+            loginError = "No configured providers were found on this system."
+            lastRefresh = Date()
+            return
+        }
+
+        applyLoadingState(for: availableProviders.map { $0.config.provider })
+        loginError = nil
+
+        for entry in availableProviders {
+            await refreshProvider(config: entry.config, token: entry.token)
+        }
+
+        if services.allSatisfy({ $0.error != nil }) {
+            loginError = "Found configured providers, but failed to fetch usage data."
         }
 
         lastRefresh = Date()
@@ -55,29 +53,63 @@ final class UsageStore: ObservableObject {
 
     // MARK: - Helpers
 
-    private func setClaudeLoading(_ loading: Bool) {
-        if let idx = services.firstIndex(where: { $0.serviceName == "Claude" }) {
-            services[idx].isLoading = loading
-            services[idx].error = nil
-        } else if loading {
-            services.append(ServiceUsage(
+    private func discoverAvailableProviders() -> [(config: ProviderConfig, token: String)] {
+        ProviderRegistry.configuredProviders
+            .filter { $0.isEnabled }
+            .compactMap { config in
+                guard let token = KeychainService.resolveToken(using: config.tokenLookupMethods) else {
+                    return nil
+                }
+                return (config: config, token: token)
+            }
+    }
+
+    private func applyLoadingState(for providers: [ProviderKind]) {
+        services = providers.map { provider in
+            ServiceUsage(
                 id: UUID(),
-                serviceName: "Claude",
-                iconName: "brain",
+                serviceName: provider.displayName,
+                iconName: provider.iconName,
                 inputTokens: 0,
                 outputTokens: 0,
-                monthlyTokenLimit: 0,
+                monthlyTokenLimit: 100,
                 costUSD: 0,
                 lastUpdated: Date(),
-                primaryMetricValue: "0 in · 0 out",
-                secondaryMetricValue: "0 read · 0 write",
+                primaryMetricLabel: "7-Day Usage",
+                primaryMetricValue: "0%",
+                secondaryMetricLabel: "5-Hour Usage",
+                secondaryMetricValue: "0%",
                 isLoading: true
-            ))
+            )
         }
     }
 
-    private func setClaudeError(_ message: String) {
-        if let idx = services.firstIndex(where: { $0.serviceName == "Claude" }) {
+    private func refreshProvider(config: ProviderConfig, token: String) async {
+        switch config.provider {
+        case .claude:
+            do {
+                let snapshot = try await claudeService.fetchUsage(bearerToken: token)
+                updateClaudeUsage(from: snapshot)
+            } catch {
+                setProviderError(name: config.provider.displayName, message: error.localizedDescription)
+            }
+        case .githubCopilot:
+            do {
+                let snapshot = try await copilotService.fetchUsage(bearerToken: token)
+                updateGitHubCopilotUsage(from: snapshot)
+            } catch {
+                setProviderError(name: config.provider.displayName, message: error.localizedDescription)
+            }
+        case .codex:
+            setProviderError(
+                name: config.provider.displayName,
+                message: "Provider detected, but usage fetching is not implemented yet."
+            )
+        }
+    }
+
+    private func setProviderError(name: String, message: String) {
+        if let idx = services.firstIndex(where: { $0.serviceName == name }) {
             services[idx].isLoading = false
             services[idx].error = message
         }
@@ -122,6 +154,31 @@ final class UsageStore: ObservableObject {
                 secondaryMetricValue: "\(Int(fiveHourPercent.rounded()))%",
                 detailText: nil
             ))
+        }
+    }
+
+    private func updateGitHubCopilotUsage(from snapshot: GitHubCopilotUsageSnapshot) {
+        let now = Date()
+        let remainingPercent = min(max(snapshot.percentRemaining, 0), 100)
+        let consumedPercent = 100 - remainingPercent
+        let consumedRequests = max(snapshot.entitlement - snapshot.remaining, 0)
+        let entitlement = max(snapshot.entitlement, 1)
+
+        if let idx = services.firstIndex(where: { $0.serviceName == "GitHub Copilot" }) {
+            services[idx].inputTokens = consumedRequests
+            services[idx].outputTokens = 0
+            services[idx].monthlyTokenLimit = entitlement
+            services[idx].lastUpdated = now
+            services[idx].isLoading = false
+            services[idx].error = nil
+            services[idx].resetDate = snapshot.quotaResetDate
+            services[idx].secondaryResetDate = nil
+            services[idx].usageRatioOverride = consumedPercent / 100
+            services[idx].primaryMetricLabel = "Percentage"
+            services[idx].primaryMetricValue = String(format: "%.1f%%", consumedPercent)
+            services[idx].secondaryMetricLabel = "Requests"
+            services[idx].secondaryMetricValue = "\(consumedRequests)/\(entitlement)"
+            services[idx].detailText = "Premium quota consumption"
         }
     }
 

@@ -2,13 +2,13 @@ import Foundation
 import Security
 
 enum KeychainService {
-    private static let service = "Claude Code-credentials"
+    private static let legacyService = "Claude Code-credentials"
 
     static func save(key: String, value: String) throws {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: legacyService,
             kSecAttrAccount as String: key,
             kSecValueData as String: data
         ]
@@ -22,7 +22,7 @@ enum KeychainService {
     static func load(key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: legacyService,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
@@ -36,10 +36,49 @@ enum KeychainService {
     static func delete(key: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: legacyService,
             kSecAttrAccount as String: key
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    static func loadValue(service: String, account: String?) -> String? {
+        guard let data = loadData(service: service, account: account) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func loadJSONValue(service: String, account: String?, path: [String]) -> String? {
+        guard let data = loadData(service: service, account: account),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        var current: Any = json
+        for key in path {
+            guard let dict = current as? [String: Any], let next = dict[key] else {
+                return nil
+            }
+            current = next
+        }
+
+        return current as? String
+    }
+
+    private static func loadData(service: String, account: String?) -> Data? {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        if let account {
+            query[kSecAttrAccount as String] = account
+        }
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess else { return nil }
+        return result as? Data
     }
 
     enum KeychainError: Error {
@@ -52,23 +91,21 @@ extension KeychainService {
     static let orgId = "claude_org_id"
     static let deviceId = "claude_device_id"
 
-    /// Legge il token OAuth da "Claude Code-credentials" nel Keychain,
-    /// parsando il JSON { "claudeAiOauth": { "accessToken": "..." } }
-    static func loadClaudeAccessToken() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let oauth = json["claudeAiOauth"] as? [String: Any],
-              let token = oauth["accessToken"] as? String
-        else { return nil }
-        return token
+    static func resolveToken(using methods: [TokenLookupMethod]) -> String? {
+        for method in methods {
+            switch method {
+            case let .keychainJSON(service, account, path):
+                let normalized = loadJSONValue(service: service, account: account, path: path)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let token = normalized, !token.isEmpty {
+                    return token
+                }
+            case let .keychainValue(service, account):
+                let normalized = loadValue(service: service, account: account)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let token = normalized, !token.isEmpty {
+                    return token
+                }
+            }
+        }
+        return nil
     }
 }

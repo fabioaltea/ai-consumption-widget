@@ -2,25 +2,21 @@ import Foundation
 
 actor ClaudeWebService {
     private let baseURL = "https://api.anthropic.com/api/oauth/usage"
-    private var bearerToken: String? { KeychainService.loadClaudeAccessToken() }
-    func fetchUsage() async throws -> ClaudeUsageSnapshot {
-        let response = try await fetchOAuthUsage()
+
+    func fetchUsage(bearerToken: String) async throws -> ClaudeUsageSnapshot {
+        let response = try await fetchOAuthUsage(bearerToken: bearerToken)
         return parseSnapshot(from: response)
     }
 
-    private func fetchOAuthUsage() async throws -> AnthropicOAuthUsageResponse {
+    private func fetchOAuthUsage(bearerToken: String) async throws -> AnthropicOAuthUsageResponse {
         guard let url = URL(string: baseURL) else {
             throw AppError.networkError("Invalid URL")
-        }
-
-        guard let token = bearerToken else {
-            throw AppError.unauthorized
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
 
         print("[ClaudeWebService] Fetching from: \(baseURL)")
         let (data, response) = try await URLSession.shared.data(for: request)

@@ -5,60 +5,13 @@ struct UsageDashboardView: View {
     private enum UsageWindow: String {
         case fiveHours = "5 hours"
         case weekly = "weekly"
+        case requests = "requests"
+        case percentage = "percentage"
     }
 
     @ObservedObject var store: UsageStore
-    @State private var selectedWindow: UsageWindow = .weekly
+    @State private var selectedWindows: [UUID: UsageWindow] = [:]
     @State private var expandedServiceId: UUID? = nil
-
-    private var sevenDayPercentage: Double {
-        (store.services.first?.usageRatio ?? 0.0) * 100
-    }
-
-    private var fiveHourPercentage: Double {
-        metricPercentage(from: store.services.first?.secondaryMetricValue)
-    }
-
-    private var selectedPercentage: Double {
-        selectedWindow == .weekly ? sevenDayPercentage : fiveHourPercentage
-    }
-
-    private var selectedProgressRatio: Double {
-        min(max(selectedPercentage / 100, 0), 1)
-    }
-
-    private var selectedMetricLabel: String {
-        switch selectedWindow {
-        case .fiveHours:
-            return store.services.first?.secondaryMetricLabel ?? "5-Hour Usage"
-        case .weekly:
-            return store.services.first?.primaryMetricLabel ?? "7-Day Usage"
-        }
-    }
-
-    private var selectedMetricValue: String {
-        switch selectedWindow {
-        case .fiveHours:
-            return store.services.first?.secondaryMetricValue ?? "0%"
-        case .weekly:
-            return store.services.first?.primaryMetricValue ?? "0%"
-        }
-    }
-
-    private var selectedResetText: String? {
-        guard let service = store.services.first else {
-            return nil
-        }
-
-        switch selectedWindow {
-        case .weekly:
-            guard let resetDate = service.resetDate else { return nil }
-            return shortResetText(from: resetDate)
-        case .fiveHours:
-            guard let resetDate = service.secondaryResetDate else { return nil }
-            return shortResetText(from: resetDate)
-        }
-    }
 
     private var refreshHelpText: String {
         if let lastRefresh = store.lastRefresh {
@@ -68,23 +21,40 @@ struct UsageDashboardView: View {
         return "Refresh usage"
     }
 
-    private var usageColor: Color {
-        let ratio = selectedProgressRatio
-        switch ratio {
-        case 0..<0.6: return .green
-        case 0.6..<0.85: return .orange
-        default: return .red
-        }
-    }
-
     private func getMetrics(for service: ServiceUsage) -> (label: String, value: String, percentage: Double, progressRatio: Double, resetText: String?, color: Color) {
+        let selectedWindow = selectedWindow(for: service)
         let weeklyPercent = service.usageRatio * 100
         let fiveHourPercent = metricPercentage(from: service.secondaryMetricValue)
-        let currentPercent = selectedWindow == .weekly ? weeklyPercent : fiveHourPercent
+        let requestsPercent = requestsPercentage(from: service.secondaryMetricValue)
 
-        let label = selectedWindow == .weekly ? service.primaryMetricLabel : service.secondaryMetricLabel
-        let value = selectedWindow == .weekly ? service.primaryMetricValue ?? "0%" : service.secondaryMetricValue ?? "0%"
-        let resetDate = selectedWindow == .weekly ? service.resetDate : service.secondaryResetDate
+        let currentPercent: Double
+        let label: String
+        let value: String
+        let resetDate: String?
+
+        switch selectedWindow {
+        case .weekly:
+            currentPercent = weeklyPercent
+            label = service.primaryMetricLabel
+            value = service.primaryMetricValue ?? "0%"
+            resetDate = service.resetDate
+        case .fiveHours:
+            currentPercent = fiveHourPercent
+            label = service.secondaryMetricLabel
+            value = service.secondaryMetricValue ?? "0%"
+            resetDate = service.secondaryResetDate
+        case .percentage:
+            currentPercent = metricPercentage(from: service.primaryMetricValue)
+            label = "Percentage"
+            value = service.primaryMetricValue ?? "0%"
+            resetDate = service.resetDate
+        case .requests:
+            currentPercent = requestsPercent
+            label = "Requests"
+            value = service.secondaryMetricValue ?? "0/0"
+            resetDate = service.resetDate
+        }
+
         let resetText = resetDate.flatMap { shortResetText(from: $0) }
 
         let ratio = min(max(currentPercent / 100, 0), 1)
@@ -97,6 +67,25 @@ struct UsageDashboardView: View {
         }()
 
         return (label, value, currentPercent, ratio, resetText, color)
+    }
+
+    private func selectedWindow(for service: ServiceUsage) -> UsageWindow {
+        if let saved = selectedWindows[service.id], availableWindows(for: service).contains(saved) {
+            return saved
+        }
+        return defaultWindow(for: service)
+    }
+
+    private func defaultWindow(for service: ServiceUsage) -> UsageWindow {
+        isCopilot(service) ? .percentage : .weekly
+    }
+
+    private func availableWindows(for service: ServiceUsage) -> [UsageWindow] {
+        isCopilot(service) ? [.requests, .percentage] : [.fiveHours, .weekly]
+    }
+
+    private func isCopilot(_ service: ServiceUsage) -> Bool {
+        service.serviceName == "GitHub Copilot"
     }
 
     var body: some View {
@@ -138,7 +127,7 @@ struct UsageDashboardView: View {
                     VStack(alignment: .leading, spacing: isExpanded ? 16 : 0) {
                         HStack {
                             if !isExpanded {
-                                claudeLogo
+                                logo(for: service)
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 18, height: 18)
@@ -184,7 +173,7 @@ struct UsageDashboardView: View {
                                         .fill(.white.opacity(0.16))
                                         .frame(width: 84, height: 84)
                                         .overlay {
-                                            claudeLogo
+                                            logo(for: service)
                                                 .resizable()
                                                 .scaledToFit()
                                                 .padding(16)
@@ -234,18 +223,13 @@ struct UsageDashboardView: View {
 
                                     Spacer()
 
-                                    LimitPill(
-                                        title: "5 hours",
-                                        isSelected: selectedWindow == .fiveHours
-                                    ) {
-                                        selectedWindow = .fiveHours
-                                    }
-
-                                    LimitPill(
-                                        title: "weekly",
-                                        isSelected: selectedWindow == .weekly
-                                    ) {
-                                        selectedWindow = .weekly
+                                    ForEach(availableWindows(for: service), id: \.self) { window in
+                                        LimitPill(
+                                            title: window.rawValue,
+                                            isSelected: selectedWindow(for: service) == window
+                                        ) {
+                                            selectedWindows[service.id] = window
+                                        }
                                     }
                                 }
                             }
@@ -269,6 +253,9 @@ struct UsageDashboardView: View {
                     .onTapGesture {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             expandedServiceId = isExpanded ? nil : service.id
+                            if !isExpanded {
+                                selectedWindows[service.id] = defaultWindow(for: service)
+                            }
                         }
                     }
                 }
@@ -288,6 +275,19 @@ struct UsageDashboardView: View {
         return Double(sanitized) ?? 0
     }
 
+    private func requestsPercentage(from value: String?) -> Double {
+        guard let value else { return 0 }
+        let parts = value.split(separator: "/")
+        guard parts.count == 2,
+              let consumed = Double(parts[0]),
+              let entitlement = Double(parts[1]),
+              entitlement > 0 else {
+            return 0
+        }
+
+        return (consumed / entitlement) * 100
+    }
+
     private func shortResetText(from rawValue: String) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -301,7 +301,19 @@ struct UsageDashboardView: View {
         return date.formatted(.dateTime.day().month(.abbreviated).hour().minute())
     }
 
-    private var claudeLogo: Image {
+    private func logo(for service: ServiceUsage) -> Image {
+        if isCopilot(service) {
+            if let named = NSImage(named: NSImage.Name("copilot-logo"))
+                ?? NSImage(named: NSImage.Name("copilot-logo.png")) {
+                return Image(nsImage: named)
+            }
+            if let url = Bundle.main.url(forResource: "copilot-logo", withExtension: "png"),
+               let fileImage = NSImage(contentsOf: url) {
+                return Image(nsImage: fileImage)
+            }
+            return Image(systemName: "bolt.circle")
+        }
+
         if let named = NSImage(named: NSImage.Name("claude-logo"))
             ?? NSImage(named: NSImage.Name("claude-logo.png")) {
             return Image(nsImage: named)
