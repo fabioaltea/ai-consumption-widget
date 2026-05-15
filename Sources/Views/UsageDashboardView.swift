@@ -251,11 +251,11 @@ struct UsageDashboardView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 16)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .stroke(.white.opacity(0.18), lineWidth: 1)
                     }
                     .shadow(color: .black.opacity(0.08), radius: 16, y: 12)
