@@ -1,85 +1,116 @@
-# Claude Consumption Widget
+# AI Consumption Widget
 
-A macOS menu bar app that shows Claude consumption (7-day and 5-hour) directly from your local Anthropic authentication.
+macOS menu bar widget to monitor AI quota usage across multiple providers from local authenticated sessions.
 
-This project started as a small Swift experiment to explore macOS menu bar development.
+## Demo
 
-## Features
+<video src="docs/demo.mov" controls muted playsinline width="900"></video>
 
-- Menu bar app (`LSUIElement`)
-- Reads OAuth token from Keychain (`Claude Code-credentials`)
-- Calls `https://api.anthropic.com/api/oauth/usage`
-- Dashboard with:
-  - 7-day usage
-  - 5-hour usage
-  - reset time
-  - UI error state
-- Manual refresh + automatic refresh every 5 minutes
+If the video player is not rendered by your Git hosting UI, open [docs/demo.mov](docs/demo.mov).
+
+![Dashboard screenshot 1](docs/screen1.png)
+![Dashboard screenshot 2](docs/screen2.png)
+![Dashboard screenshot 3](docs/screen3.png)
+
+## Implemented Features
+
+- Menu bar app (`LSUIElement`) with popover dashboard
+- Multi-provider support:
+  - Claude (Anthropic OAuth usage)
+  - Codex (ChatGPT usage endpoint)
+  - GitHub Copilot (premium quota usage)
+- Provider token auto-discovery:
+  - Claude from macOS Keychain (`Claude Code-credentials`)
+  - Copilot from macOS Keychain (`copilot-cli`)
+  - Codex from `~/.codex/auth.json`
+- Claude rate-limit recovery workflow:
+  - On `429` from `/api/oauth/usage`, refreshes OAuth token via `https://console.anthropic.com/v1/oauth/token`
+  - Persists rotated `accessToken` and `refreshToken` back to Keychain
+  - Retries usage request with fresh token
+- Copilot metrics aligned to consumed usage:
+  - Converts `percent_remaining` into consumed percentage (`100 - remaining`)
+  - `requests` and `percentage` toggles in the card
+- Dynamic card UI with provider logos (`claude-logo`, `copilot-logo`, `codex-logo`)
+- Dynamic popover height based on visible content (collapsed/expanded cards)
+- Manual refresh plus automatic refresh every 5 minutes
 
 ## Requirements
 
 - macOS 14+
 - Xcode 15+
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-- Claude Code authenticated locally (so `Claude Code-credentials` exists in Keychain)
+- Local authenticated sessions for providers you want to display
 
-## Quick Start
+## Installation
 
-1. Generate the Xcode project:
+See full install guide in [INSTALL.md](INSTALL.md).
+
+### Fast Install (No Build)
+
+1. Open the latest release in the repository
+2. Download `AIConsumptionWidget-macOS.zip`
+3. Extract `AIConsumptionWidget.app`
+4. Double click the app to launch
+
+Optional: move the app to `/Applications`.
+
+The repository includes CI packaging via [release-macos.yml](.github/workflows/release-macos.yml):
+
+- Manual trigger: `Actions` -> `Build macOS Package` -> `Run workflow`
+- Tag trigger: push tags like `v1.0.0` to auto-attach zip to the GitHub Release
+
+Build from source (optional):
+
+1. Generate project files:
 
 ```bash
 xcodegen generate
 ```
 
-2. Build:
+2. Build debug app:
 
 ```bash
 xcodebuild -project AIConsumptionWidget.xcodeproj -scheme AIConsumptionWidget -configuration Debug build
 ```
 
-3. Run from Xcode:
-- Open `AIConsumptionWidget.xcodeproj`
-- Press `Cmd + R`
-
-Or launch the Debug build directly:
+3. Launch:
 
 ```bash
 open ~/Library/Developer/Xcode/DerivedData/AIConsumptionWidget-*/Build/Products/Debug/AIConsumptionWidget.app
 ```
 
-## Authentication / Token
+## Package In Repository
 
-The app does not require manual token copy. It reads the token directly from macOS Keychain, following the same model used by Anthropic apps/tools.
+Packaging script included in the repository:
 
-For this reason, you must already be authenticated on your machine with Anthropic (for example via VS Code extension, desktop app, or CLI). The widget reuses that local authentication state.
+- [scripts/package_release.sh](scripts/package_release.sh)
 
-Current lookup details:
+It builds a Release app and creates a zip package in `dist/`.
 
-- Service: `Claude Code-credentials`
-- Expected payload shape:
+Run:
 
-```json
-{
-  "claudeAiOauth": {
-    "accessToken": "sk-ant-..."
-  }
-}
+```bash
+./scripts/package_release.sh
 ```
 
-Parsing is handled in `KeychainService.loadClaudeAccessToken()`.
+Output example:
 
-## Roadmap
+- `dist/AIConsumptionWidget-macOS.zip`
 
-- Add support for OpenAI Codex usage
-- Add support for GitHub Copilot usage
+## Authentication Notes
 
-## API Call Location
+### Claude
 
-The request is implemented in `ClaudeWebService.fetchOAuthUsage()`:
+- Reads `claudeAiOauth.accessToken` and `claudeAiOauth.refreshToken` from Keychain service `Claude Code-credentials`
+- Refresh token rotation is handled automatically when the usage endpoint rate-limits the current access token
 
-- Method: `GET`
-- Endpoint: `/api/oauth/usage`
-- Header: `Authorization: Bearer <accessToken>`
+### Copilot
+
+- Reads token from Keychain service `copilot-cli`
+
+### Codex
+
+- Reads token from `~/.codex/auth.json` (`tokens.access_token`)
 
 ## Project Structure
 
@@ -90,31 +121,27 @@ Sources/
   Stores/
   Views/
 Resources/
+scripts/
 project.yml
 ```
 
 ## Troubleshooting
 
-### I see `Unauthorized`
+### Provider card not visible
 
-- Make sure you are logged into Claude Code
-- Make sure `Claude Code-credentials` exists in Keychain
-- Restart the app after CLI login
+- Verify provider token exists in the expected source
+- Check app logs for auth/decoding errors
+- Refresh app after logging in with the provider CLI/tool
 
-### Logo is not visible
+### Claude usage fails repeatedly
 
-- Make sure `Resources/claude-logo.png` exists
+- Confirm local Claude session is still valid
+- If refresh token is expired/revoked, log in again with Claude Code
+
+### Build issues after project config changes
+
 - Regenerate project: `xcodegen generate`
-- Rebuild the app
-
-### Build warning about resources
-
-Current configuration excludes `Resources/Info.plist` from Copy Bundle Resources to avoid duplicate copy warnings.
 
 ## Development
 
-To modify target/build phases, update `project.yml` first, then regenerate the project with `xcodegen generate`.
-
-## License
-
-Add your preferred license here (MIT, Apache-2.0, etc.).
+To modify target/build phases, update `project.yml` first, then regenerate with `xcodegen generate`.
