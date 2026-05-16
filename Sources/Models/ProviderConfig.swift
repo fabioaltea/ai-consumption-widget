@@ -31,6 +31,7 @@ enum ProviderKind: String, CaseIterable {
 enum TokenLookupMethod {
     case keychainJSON(service: String, account: String?, path: [String])
     case keychainValue(service: String, account: String?)
+    case fileJSON(filePath: String, path: [String])
 }
 
 struct ProviderConfig {
@@ -54,9 +55,12 @@ enum ProviderRegistry {
         ),
         ProviderConfig(
             provider: .codex,
-            isEnabled: false,
+            isEnabled: true,
             tokenLookupMethods: [
-                .keychainValue(service: "OpenAI Codex-credentials", account: nil)
+                .fileJSON(
+                    filePath: "~/.codex/auth.json",
+                    path: ["tokens", "access_token"]
+                )
             ]
         ),
         ProviderConfig(

@@ -13,9 +13,11 @@
 		3542392E40B3E7A550B64B75 /* AIConsumptionWidgetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 187164CE9FF1FF9FFA55E7E1 /* AIConsumptionWidgetApp.swift */; };
 		3E28AE39154673D9EA402C64 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB592301CD80017C4E48BB4F /* OnboardingView.swift */; };
 		3F3CB14E7708EB8606558201 /* GitHubCopilotWebService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED95DB7749EB74303EAAE1A /* GitHubCopilotWebService.swift */; };
+		45282F9582F74ED98D62C01D /* CodexWebService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C690FB3F8240EF93180A8A /* CodexWebService.swift */; };
 		49D7B670F919287532A3B1BB /* ClaudeWebService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E787DA2DEC4896A2C9D8F5 /* ClaudeWebService.swift */; };
 		4A10CB9CC210FE76D9B4105F /* LoginWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121047B6A823D9C99AAA2D51 /* LoginWebView.swift */; };
 		5ED302BA1AC28A21C066EF48 /* UsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076481828EAA5EAAD54AE839 /* UsageStore.swift */; };
+		75ED70C4F97E46AE94D0AE62 /* codex-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 602411EB02824DC7A3C087D2 /* codex-logo.png */; };
 		962F4747FF3B4D4120CA3814 /* ServiceCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34553BAC98B87B952F2604A1 /* ServiceCardView.swift */; };
 		9DD6FAB6D76B5C287925B5DB /* ProviderConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1996667299649C14ECE848 /* ProviderConfig.swift */; };
 		C26AC217DDD9A427B011A705 /* UsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C4664E5B2ABE08BD8F0AEA /* UsageModels.swift */; };
@@ -32,11 +34,13 @@
 		121047B6A823D9C99AAA2D51 /* LoginWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginWebView.swift; sourceTree = "<group>"; };
 		187164CE9FF1FF9FFA55E7E1 /* AIConsumptionWidgetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIConsumptionWidgetApp.swift; sourceTree = "<group>"; };
 		34553BAC98B87B952F2604A1 /* ServiceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceCardView.swift; sourceTree = "<group>"; };
+		602411EB02824DC7A3C087D2 /* codex-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "codex-logo.png"; sourceTree = "<group>"; };
 		66C4664E5B2ABE08BD8F0AEA /* UsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageModels.swift; sourceTree = "<group>"; };
 		A0AF5F2B61C04186A5C71876 /* copilot-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "copilot-logo.png"; sourceTree = "<group>"; };
 		CC62C06D39705243B88FB7AA /* AIConsumptionWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIConsumptionWidget.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CED95DB7749EB74303EAAE1A /* GitHubCopilotWebService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubCopilotWebService.swift; sourceTree = "<group>"; };
 		D086E2EE1F81A744E9248360 /* UsageDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageDashboardView.swift; sourceTree = "<group>"; };
+		D5C690FB3F8240EF93180A8A /* CodexWebService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexWebService.swift; sourceTree = "<group>"; };
 		DB592301CD80017C4E48BB4F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		EF168691888260B901B6F107 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		FA34EFC76DF3E498960A28DB /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
@@ -56,6 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				06D4E5B8264F77138ABFECFB /* claude-logo.png */,
+				602411EB02824DC7A3C087D2 /* codex-logo.png */,
 				A0AF5F2B61C04186A5C71876 /* copilot-logo.png */,
 			);
 			path = Resources;
@@ -116,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				03E787DA2DEC4896A2C9D8F5 /* ClaudeWebService.swift */,
+				D5C690FB3F8240EF93180A8A /* CodexWebService.swift */,
 				CED95DB7749EB74303EAAE1A /* GitHubCopilotWebService.swift */,
 				FA34EFC76DF3E498960A28DB /* KeychainService.swift */,
 			);
@@ -182,6 +188,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7BE982AFE3B666BBD239444 /* claude-logo.png in Resources */,
+				75ED70C4F97E46AE94D0AE62 /* codex-logo.png in Resources */,
 				C9A40A81893F4D32A77491E1 /* copilot-logo.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -196,6 +203,7 @@
 				3542392E40B3E7A550B64B75 /* AIConsumptionWidgetApp.swift in Sources */,
 				0B082CA7FB203D9F76D05FAB /* AppDelegate.swift in Sources */,
 				49D7B670F919287532A3B1BB /* ClaudeWebService.swift in Sources */,
+				45282F9582F74ED98D62C01D /* CodexWebService.swift in Sources */,
 				3F3CB14E7708EB8606558201 /* GitHubCopilotWebService.swift in Sources */,
 				154CBFFFFC38E424BCE82B48 /* KeychainService.swift in Sources */,
 				4A10CB9CC210FE76D9B4105F /* LoginWebView.swift in Sources */,

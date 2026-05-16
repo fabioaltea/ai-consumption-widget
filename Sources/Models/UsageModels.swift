@@ -93,6 +93,33 @@ struct GitHubCopilotUsageSnapshot {
     let quotaResetDate: String?
 }
 
+// Codex API responses
+
+struct CodexUsageResponse: Codable {
+    let plan_type: String?
+    let rate_limit: CodexRateLimit
+}
+
+struct CodexRateLimit: Codable {
+    let primary_window: CodexRateLimitWindow
+}
+
+struct CodexRateLimitWindow: Codable {
+    let used_percent: Double
+    let reset_at: TimeInterval?
+
+    var resetAtDateString: String? {
+        guard let reset_at else { return nil }
+        return ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: reset_at))
+    }
+}
+
+struct CodexUsageSnapshot {
+    let usedPercent: Double
+    let resetAt: String?
+    let planType: String?
+}
+
 // Anthropic API responses
 
 struct AnthropicUsageResponse: Codable {

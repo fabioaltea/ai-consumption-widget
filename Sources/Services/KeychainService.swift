@@ -52,15 +52,18 @@ enum KeychainService {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
 
-        var current: Any = json
-        for key in path {
-            guard let dict = current as? [String: Any], let next = dict[key] else {
-                return nil
-            }
-            current = next
-        }
+        return stringValue(in: json, at: path)
+    }
 
-        return current as? String
+    static func loadJSONFileValue(filePath: String, path: [String]) -> String? {
+        let expandedPath = NSString(string: filePath).expandingTildeInPath
+        let fileURL = URL(fileURLWithPath: expandedPath)
+
+        guard let data = try? Data(contentsOf: fileURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        return stringValue(in: json, at: path)
     }
 
     private static func loadData(service: String, account: String?) -> Data? {
@@ -84,6 +87,18 @@ enum KeychainService {
     enum KeychainError: Error {
         case saveFailed(OSStatus)
     }
+
+    private static func stringValue(in json: [String: Any], at path: [String]) -> String? {
+        var current: Any = json
+        for key in path {
+            guard let dict = current as? [String: Any], let next = dict[key] else {
+                return nil
+            }
+            current = next
+        }
+
+        return current as? String
+    }
 }
 
 extension KeychainService {
@@ -101,6 +116,11 @@ extension KeychainService {
                 }
             case let .keychainValue(service, account):
                 let normalized = loadValue(service: service, account: account)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let token = normalized, !token.isEmpty {
+                    return token
+                }
+            case let .fileJSON(filePath, path):
+                let normalized = loadJSONFileValue(filePath: filePath, path: path)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 if let token = normalized, !token.isEmpty {
                     return token
                 }

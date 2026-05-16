@@ -45,7 +45,7 @@ struct UsageDashboardView: View {
             resetDate = service.secondaryResetDate
         case .percentage:
             currentPercent = metricPercentage(from: service.primaryMetricValue)
-            label = "Percentage"
+            label = service.primaryMetricLabel
             value = service.primaryMetricValue ?? "0%"
             resetDate = service.resetDate
         case .requests:
@@ -77,191 +77,206 @@ struct UsageDashboardView: View {
     }
 
     private func defaultWindow(for service: ServiceUsage) -> UsageWindow {
-        isCopilot(service) ? .percentage : .weekly
+        if isCopilot(service) || isCodex(service) {
+            return .percentage
+        }
+        return .weekly
     }
 
     private func availableWindows(for service: ServiceUsage) -> [UsageWindow] {
-        isCopilot(service) ? [.requests, .percentage] : [.fiveHours, .weekly]
+        if isCopilot(service) {
+            return [.requests, .percentage]
+        }
+        if isCodex(service) {
+            return [.percentage]
+        }
+        return [.fiveHours, .weekly]
     }
 
     private func isCopilot(_ service: ServiceUsage) -> Bool {
         service.serviceName == "GitHub Copilot"
     }
 
+    private func isCodex(_ service: ServiceUsage) -> Bool {
+        service.serviceName == "Codex"
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
-            if store.services.isEmpty {
-                VStack {
-                    VStack(spacing: 10) {
-                        if let error = store.loginError {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.red)
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .multilineTextAlignment(.center)
-                        } else {
-                            ProgressView()
-                            Text("Loading usage data...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 32)
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 16)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(.white.opacity(0.18), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 28, y: 12)
-            } else {
-                ForEach(store.services) { service in
-                    let isExpanded = expandedServiceId == service.id
-                    let metrics = getMetrics(for: service)
-
-                    VStack(alignment: .leading, spacing: isExpanded ? 16 : 0) {
-                        HStack {
-                            if !isExpanded {
-                                logo(for: service)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 18, height: 18)
-                                    .padding(4)
-                                    .background(.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            }
-                            Text(service.serviceName)
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            Spacer()
-                            if isExpanded {
-                                Button {
-                                    Task { await store.refresh() }
-                                } label: {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .frame(width: 26, height: 26)
-                                }
-                                .buttonStyle(.plain)
-                                .background(.white.opacity(0.18), in: Circle())
-                                .disabled(service.isLoading)
-                            } else {
-                                Text(metrics.value)
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(metrics.color)
-                            }
-                        }
-                        if let error = service.error {
-                            HStack(spacing: 6) {
+        ScrollView {
+            VStack(spacing: 12) {
+                if store.services.isEmpty {
+                    VStack {
+                        VStack(spacing: 10) {
+                            if let error = store.loginError {
                                 Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.system(size: 11))
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.red)
                                 Text(error)
-                                    .font(.system(size: 11))
-                                    .lineLimit(2)
-                            }
-                            .foregroundStyle(.red)
-                            .padding(.top, 2)
-                        }
-
-                        if isExpanded {
-                            VStack(alignment: .leading, spacing: 14) {
-                                HStack(alignment: .center, spacing: 14) {
-                                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                        .fill(.white.opacity(0.16))
-                                        .frame(width: 84, height: 84)
-                                        .overlay {
-                                            logo(for: service)
-                                                .resizable()
-                                                .scaledToFit()
-                                                .padding(16)
-                                        }
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                                .stroke(.white.opacity(0.22), lineWidth: 1)
-                                        }
-
-                                    Spacer(minLength: 0)
-
-                                    VStack(alignment: .trailing, spacing: 4) {
-                                        Text(metrics.label)
-                                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.secondary)
-                                        Text(metrics.value)
-                                            .font(.system(size: 42, weight: .semibold, design: .rounded))
-                                            .contentTransition(.numericText())
-                                            .lineLimit(1)
-                                    }
-                                }
-
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(.white.opacity(0.14))
-
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(metrics.color.gradient)
-                                            .frame(width: max(18, geo.size.width * metrics.progressRatio))
-                                            .animation(.easeInOut(duration: 0.25), value: metrics.progressRatio)
-                                    }
-                                }
-                                .frame(height: 18)
-
-                                HStack(alignment: .center, spacing: 10) {
-                                    if let resetText = metrics.resetText {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Resets")
-                                                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(.secondary)
-                                            Text(resetText)
-                                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                                .foregroundStyle(.primary.opacity(0.82))
-                                        }
-                                    }
-
-                                    Spacer()
-
-                                    ForEach(availableWindows(for: service), id: \.self) { window in
-                                        LimitPill(
-                                            title: window.rawValue,
-                                            isSelected: selectedWindow(for: service) == window
-                                        ) {
-                                            selectedWindows[service.id] = window
-                                        }
-                                    }
-                                }
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .multilineTextAlignment(.center)
+                            } else {
+                                ProgressView()
+                                Text("Loading usage data...")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .stroke(.white.opacity(0.18), lineWidth: 1)
                     }
-                    .shadow(color: .black.opacity(0.08), radius: 16, y: 12)
-                    .onHover { hovering in
-                        if hovering {
-                            NSCursor.pointingHand.push()
-                        } else {
-                            NSCursor.pop()
+                    .shadow(color: .black.opacity(0.08), radius: 28, y: 12)
+                } else {
+                    ForEach(store.services) { service in
+                        let isExpanded = expandedServiceId == service.id
+                        let metrics = getMetrics(for: service)
+
+                        VStack(alignment: .leading, spacing: isExpanded ? 16 : 0) {
+                            HStack {
+                                if !isExpanded {
+                                    logo(for: service)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 18, height: 18)
+                                        .padding(4)
+                                        .background(.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                }
+                                Text(service.serviceName)
+                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                Spacer()
+                                if isExpanded {
+                                    Button {
+                                        Task { await store.refresh() }
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .frame(width: 26, height: 26)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .background(.white.opacity(0.18), in: Circle())
+                                    .disabled(service.isLoading)
+                                } else {
+                                    Text(metrics.value)
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(metrics.color)
+                                }
+                            }
+                            if let error = service.error {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 11))
+                                    Text(error)
+                                        .font(.system(size: 11))
+                                        .lineLimit(2)
+                                }
+                                .foregroundStyle(.red)
+                                .padding(.top, 2)
+                            }
+
+                            if isExpanded {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    HStack(alignment: .center, spacing: 14) {
+                                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                            .fill(.white.opacity(0.16))
+                                            .frame(width: 84, height: 84)
+                                            .overlay {
+                                                logo(for: service)
+                                                    .resizable()
+                                                    .scaledToFit()
+                                                    .padding(16)
+                                            }
+                                            .overlay {
+                                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                                    .stroke(.white.opacity(0.22), lineWidth: 1)
+                                            }
+
+                                        Spacer(minLength: 0)
+
+                                        VStack(alignment: .trailing, spacing: 4) {
+                                            Text(metrics.label)
+                                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.secondary)
+                                            Text(metrics.value)
+                                                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                                                .contentTransition(.numericText())
+                                                .lineLimit(1)
+                                        }
+                                    }
+
+                                    GeometryReader { geo in
+                                        ZStack(alignment: .leading) {
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(.white.opacity(0.14))
+
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(metrics.color.gradient)
+                                                .frame(width: max(18, geo.size.width * metrics.progressRatio))
+                                                .animation(.easeInOut(duration: 0.25), value: metrics.progressRatio)
+                                        }
+                                    }
+                                    .frame(height: 18)
+
+                                    HStack(alignment: .center, spacing: 10) {
+                                        if let resetText = metrics.resetText {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("Resets")
+                                                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                                    .foregroundStyle(.secondary)
+                                                Text(resetText)
+                                                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                                                    .foregroundStyle(.primary.opacity(0.82))
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        ForEach(availableWindows(for: service), id: \.self) { window in
+                                            LimitPill(
+                                                title: window.rawValue,
+                                                isSelected: selectedWindow(for: service) == window
+                                            ) {
+                                                selectedWindows[service.id] = window
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            expandedServiceId = isExpanded ? nil : service.id
-                            if !isExpanded {
-                                selectedWindows[service.id] = defaultWindow(for: service)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(.white.opacity(0.18), lineWidth: 1)
+                        }
+                        .shadow(color: .black.opacity(0.08), radius: 16, y: 12)
+                        .onHover { hovering in
+                            if hovering {
+                                NSCursor.pointingHand.push()
+                            } else {
+                                NSCursor.pop()
+                            }
+                        }
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                expandedServiceId = isExpanded ? nil : service.id
+                                if !isExpanded {
+                                    selectedWindows[service.id] = defaultWindow(for: service)
+                                }
                             }
                         }
                     }
                 }
             }
+            .padding(14)
         }
-        .padding(14)
         .onAppear {
             if expandedServiceId == nil && !store.services.isEmpty {
                 expandedServiceId = store.services.first?.id
@@ -302,27 +317,27 @@ struct UsageDashboardView: View {
     }
 
     private func logo(for service: ServiceUsage) -> Image {
-        if isCopilot(service) {
-            if let named = NSImage(named: NSImage.Name("copilot-logo"))
-                ?? NSImage(named: NSImage.Name("copilot-logo.png")) {
-                return Image(nsImage: named)
-            }
-            if let url = Bundle.main.url(forResource: "copilot-logo", withExtension: "png"),
-               let fileImage = NSImage(contentsOf: url) {
-                return Image(nsImage: fileImage)
-            }
-            return Image(systemName: "bolt.circle")
+        if isCodex(service) {
+            return bundledLogo(named: "codex-logo", fallback: "terminal.circle")
         }
 
-        if let named = NSImage(named: NSImage.Name("claude-logo"))
-            ?? NSImage(named: NSImage.Name("claude-logo.png")) {
+        if isCopilot(service) {
+            return bundledLogo(named: "copilot-logo", fallback: "bolt.circle")
+        }
+
+        return bundledLogo(named: "claude-logo", fallback: "brain.filled.head.profile")
+    }
+
+    private func bundledLogo(named name: String, fallback systemName: String) -> Image {
+        if let named = NSImage(named: NSImage.Name(name))
+            ?? NSImage(named: NSImage.Name("\(name).png")) {
             return Image(nsImage: named)
         }
-        if let url = Bundle.main.url(forResource: "claude-logo", withExtension: "png"),
+        if let url = Bundle.main.url(forResource: name, withExtension: "png"),
            let fileImage = NSImage(contentsOf: url) {
             return Image(nsImage: fileImage)
         }
-        return Image(systemName: "brain.filled.head.profile")
+        return Image(systemName: systemName)
     }
 }
 

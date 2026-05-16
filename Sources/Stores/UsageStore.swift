@@ -8,6 +8,7 @@ final class UsageStore: ObservableObject {
     @Published var loginError: String? = nil
 
     private let claudeService = ClaudeWebService()
+    private let codexService = CodexWebService()
     private let copilotService = GitHubCopilotWebService()
     private var refreshTask: Task<Void, Never>? = nil
 
@@ -101,10 +102,12 @@ final class UsageStore: ObservableObject {
                 setProviderError(name: config.provider.displayName, message: error.localizedDescription)
             }
         case .codex:
-            setProviderError(
-                name: config.provider.displayName,
-                message: "Provider detected, but usage fetching is not implemented yet."
-            )
+            do {
+                let snapshot = try await codexService.fetchUsage(bearerToken: token)
+                updateCodexUsage(from: snapshot)
+            } catch {
+                setProviderError(name: config.provider.displayName, message: error.localizedDescription)
+            }
         }
     }
 
@@ -179,6 +182,29 @@ final class UsageStore: ObservableObject {
             services[idx].secondaryMetricLabel = "Requests"
             services[idx].secondaryMetricValue = "\(consumedRequests)/\(entitlement)"
             services[idx].detailText = "Premium quota consumption"
+        }
+    }
+
+    private func updateCodexUsage(from snapshot: CodexUsageSnapshot) {
+        let now = Date()
+        let usedPercent = min(max(snapshot.usedPercent, 0), 100)
+        let planText = snapshot.planType.map { "\($0.capitalized) plan" } ?? "Codex usage"
+
+        if let idx = services.firstIndex(where: { $0.serviceName == "Codex" }) {
+            services[idx].inputTokens = Int(usedPercent.rounded())
+            services[idx].outputTokens = 0
+            services[idx].monthlyTokenLimit = 100
+            services[idx].lastUpdated = now
+            services[idx].isLoading = false
+            services[idx].error = nil
+            services[idx].resetDate = snapshot.resetAt
+            services[idx].secondaryResetDate = nil
+            services[idx].usageRatioOverride = usedPercent / 100
+            services[idx].primaryMetricLabel = "Weekly Usage"
+            services[idx].primaryMetricValue = "\(Int(usedPercent.rounded()))%"
+            services[idx].secondaryMetricLabel = "Plan"
+            services[idx].secondaryMetricValue = planText
+            services[idx].detailText = "ChatGPT Codex usage"
         }
     }
 
