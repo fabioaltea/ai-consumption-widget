@@ -4,13 +4,11 @@ macOS menu bar widget to monitor AI quota usage across multiple providers from l
 
 ## Demo
 
-<video src="docs/demo.mov" controls muted playsinline width="900"></video>
-
-If the video player is not rendered by your Git hosting UI, open [docs/demo.mov](docs/demo.mov).
-
-![Dashboard screenshot 1](docs/screen1.png)
-![Dashboard screenshot 2](docs/screen2.png)
-![Dashboard screenshot 3](docs/screen3.png)
+<p align="center">
+  <img src="docs/screen1.png" alt="Dashboard screenshot 1" width="32%" />
+  <img src="docs/screen2.png" alt="Dashboard screenshot 2" width="32%" />
+  <img src="docs/screen3.png" alt="Dashboard screenshot 3" width="32%" />
+</p>
 
 ## Implemented Features
 
