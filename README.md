@@ -41,14 +41,18 @@ macOS menu bar widget to monitor AI quota usage across multiple providers from l
 
 ## Installation
 
-See full install guide in [INSTALL.md](INSTALL.md).
+Releases page:
+
+- https://github.com/fabioaltea/ai-consumption-widget/releases
 
 ### Fast Install (No Build)
 
-1. Open the latest release in the repository
+1. Open the releases page above
 2. Download `AIConsumptionWidget-macOS.zip`
 3. Extract `AIConsumptionWidget.app`
 4. Double click the app to launch
+
+If macOS blocks first launch, right click the app and choose `Open`.
 
 Optional: move the app to `/Applications`.
 
