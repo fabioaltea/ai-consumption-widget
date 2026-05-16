@@ -55,6 +55,45 @@ enum KeychainService {
         return stringValue(in: json, at: path)
     }
 
+    static func loadJSONDictionary(service: String, account: String?) -> [String: Any]? {
+        guard let data = loadData(service: service, account: account),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        return json
+    }
+
+    static func saveJSONDictionary(service: String, account: String?, json: [String: Any]) throws {
+        let data = try JSONSerialization.data(withJSONObject: json)
+        let existingAccount = loadItem(service: service, account: account)?.account
+        let resolvedAccount = account ?? existingAccount
+
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service
+        ]
+
+        if let resolvedAccount {
+            query[kSecAttrAccount as String] = resolvedAccount
+        }
+
+        let status: OSStatus
+        if loadItem(service: service, account: account) != nil {
+            status = SecItemUpdate(
+                query as CFDictionary,
+                [kSecValueData as String: data] as CFDictionary
+            )
+        } else {
+            var item = query
+            item[kSecValueData as String] = data
+            status = SecItemAdd(item as CFDictionary, nil)
+        }
+
+        guard status == errSecSuccess else {
+            throw KeychainError.saveFailed(status)
+        }
+    }
+
     static func loadJSONFileValue(filePath: String, path: [String]) -> String? {
         let expandedPath = NSString(string: filePath).expandingTildeInPath
         let fileURL = URL(fileURLWithPath: expandedPath)
@@ -67,10 +106,15 @@ enum KeychainService {
     }
 
     private static func loadData(service: String, account: String?) -> Data? {
+        loadItem(service: service, account: account)?.data
+    }
+
+    private static func loadItem(service: String, account: String?) -> (data: Data, account: String?)? {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
@@ -81,7 +125,12 @@ enum KeychainService {
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess else { return nil }
-        return result as? Data
+                guard let item = result as? [String: Any],
+                            let data = item[kSecValueData as String] as? Data else {
+                        return nil
+                }
+
+                return (data: data, account: item[kSecAttrAccount as String] as? String)
     }
 
     enum KeychainError: Error {

@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var eventMonitor: Any?
+    private let popoverWidth: CGFloat = 320
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -25,10 +26,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPopover() {
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 320, height: 480)
+        popover.contentSize = NSSize(width: popoverWidth, height: 1)
         popover.behavior = .transient
         popover.animates = true
-        popover.contentViewController = NSHostingController(rootView: MenuBarView())
+        popover.contentViewController = NSHostingController(
+            rootView: MenuBarView { [weak self] contentHeight in
+                self?.updatePopoverHeight(contentHeight)
+            }
+        )
+    }
+
+    private func updatePopoverHeight(_ contentHeight: CGFloat) {
+        let nextSize = NSSize(width: popoverWidth, height: max(1, ceil(contentHeight)))
+
+        guard popover.contentSize != nextSize else {
+            return
+        }
+
+        popover.contentSize = nextSize
     }
 
     @objc private func togglePopover(_ sender: AnyObject?) {
